@@ -21,6 +21,7 @@ test:
 .PHONY: deps.header
 deps.header:
 	git clone --depth 1 ${DUCKDB_REPO}
+	git -C ./duckdb fetch --depth 1 origin ${DUCKDB_REF}
 	git -C ./duckdb checkout ${DUCKDB_REF}
 	cp duckdb/src/include/duckdb.h duckdb.h
 

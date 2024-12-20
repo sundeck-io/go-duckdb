@@ -34,6 +34,28 @@ duckdb:
 
 DUCKDB_COMMON_BUILD_FLAGS := BUILD_SHELL=0 BUILD_UNITTESTS=0 DUCKDB_PLATFORM=any ENABLE_EXTENSION_AUTOLOADING=1 ENABLE_EXTENSION_AUTOINSTALL=1 BUILD_EXTENSIONS="json"
 
+# Function to extract objects, re-archive them, and clean up
+define rearchive_duckdb_bundle
+	# Create a temporary directory to hold the extracted object files
+	mkdir -p duckdb/build/release/extracted_objs
+
+	# Loop through all .a files in the specified directory
+	# Extract them and rename objects to avoid overwriting
+	for lib in duckdb/build/release/bundle/*.a; do \
+		lib_name=$$(basename $$lib .a); \
+		ar x $$lib; \
+		for obj in *.o; do \
+			mv $$obj duckdb/build/release/extracted_objs/$$lib_name-$$obj; \
+		done; \
+	done
+
+	# Create a new static library with all the object files from the extracted_objs directory
+	ar rcs duckdb/build/release/libduckdb_bundle.a duckdb/build/release/extracted_objs/*
+
+	# Clean up temporary directory
+	rm -rf duckdb/build/release/extracted_objs
+endef
+
 .PHONY: deps.darwin.amd64
 deps.darwin.amd64: duckdb
 	if [ "$(shell uname -s | tr '[:upper:]' '[:lower:]')" != "darwin" ]; then echo "Error: must run build on darwin"; false; fi
@@ -41,6 +63,9 @@ deps.darwin.amd64: duckdb
 
 	cd duckdb && \
 	CFLAGS="-target x86_64-apple-macos11 -O3" CXXFLAGS="-target x86_64-apple-macos11 -O3" ${DUCKDB_COMMON_BUILD_FLAGS} make bundle-library -j 2
+
+	$(call rearchive_duckdb_bundle)
+
 	cp duckdb/build/release/libduckdb_bundle.a deps/darwin_amd64/libduckdb.a
 
 .PHONY: deps.darwin.arm64
@@ -50,6 +75,9 @@ deps.darwin.arm64: duckdb
 
 	cd duckdb && \
 	CFLAGS="-target arm64-apple-macos11 -O3" CXXFLAGS="-target arm64-apple-macos11 -O3" ${DUCKDB_COMMON_BUILD_FLAGS}  make bundle-library -j 2
+
+	$(call rearchive_duckdb_bundle)
+
 	cp duckdb/build/release/libduckdb_bundle.a deps/darwin_arm64/libduckdb.a
 
 .PHONY: deps.linux.amd64
@@ -59,6 +87,9 @@ deps.linux.amd64: duckdb
 
 	cd duckdb && \
 	CFLAGS="-O3" CXXFLAGS="-O3" ${DUCKDB_COMMON_BUILD_FLAGS} make bundle-library -j 2
+
+	$(call rearchive_duckdb_bundle)
+
 	cp duckdb/build/release/libduckdb_bundle.a deps/linux_amd64/libduckdb.a
 
 .PHONY: deps.linux.arm64
@@ -68,6 +99,9 @@ deps.linux.arm64: duckdb
 
 	cd duckdb && \
 	CC="aarch64-linux-gnu-gcc" CXX="aarch64-linux-gnu-g++" CFLAGS="-O3" CXXFLAGS="-O3" ${DUCKDB_COMMON_BUILD_FLAGS} make bundle-library -j 2
+
+	$(call rearchive_duckdb_bundle)
+
 	cp duckdb/build/release/libduckdb_bundle.a deps/linux_arm64/libduckdb.a
 
 .PHONY: deps.freebsd.amd64
@@ -77,6 +111,9 @@ deps.freebsd.amd64: duckdb
 
 	cd duckdb && \
 	CFLAGS="-O3" CXXFLAGS="-O3" ${DUCKDB_COMMON_BUILD_FLAGS} gmake bundle-library -j 2
+
+	$(call rearchive_duckdb_bundle)
+
 	cp duckdb/build/release/libduckdb_bundle.a deps/freebsd_amd64/libduckdb.a
 
 .PHONY: deps.windows.amd64
@@ -96,5 +133,7 @@ deps.windows.amd64: duckdb
 		find . -name '*.a' -exec ${AR} -x {} \;
 	cd duckdb/build/release/bundle && \
 		${AR} cr ../libduckdb_bundle.a *.obj
+
+	$(call rearchive_duckdb_bundle)
 
 	cp duckdb/build/release/libduckdb_bundle.a deps/windows_amd64/libduckdb.a

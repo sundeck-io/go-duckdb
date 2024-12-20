@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/**"
       - "Makefile"
+
 jobs:
   prepare:
     runs-on: ubuntu-20.04
